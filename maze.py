@@ -8,6 +8,8 @@ pygame.init()
 SIZE = 40
 SCR_WID = 0
 SCR_HEI = 0
+MARGIN = 5
+
 WALL_COL = (0, 255, 0)
 PATH_ONCE = (0, 120, 120)
 PATH_TWICE = (0, 40, 40)
@@ -16,11 +18,17 @@ END_COL = (0, 0, 255)
 CLOSE_COL = (40, 40, 40)
 OPEN_COL = (100, 80, 80)
 FINAL_COL = (80, 120, 80)
-MARGIN = 10
+PLAYER_COL = (255, 255, 255)
 
-pressedAlr = False
+playerBox = pygame.Rect(SIZE / 2 + MARGIN, SIZE / 2 + MARGIN, 30, 30)
+playerCol = 0
+playerRow = 0
+
+playMode = False
+showPath = False
 mazeFinished = False
 pathCreated = False
+
 cellWidth = int(input("Enter Number of Cells in Width (MAX: 40): "))
 cellHeight = int(input("Enter Number of Cells in Height (MAX: 30): "))
 
@@ -48,27 +56,29 @@ class Tile:
         self.visitedTwice = False
         self.distance = math.inf
 
-    def drawTiles(self):
+    def drawTiles(self, surface):
         
-        pygame.draw.rect(SCREEN, self.color, self.rect)
+        pygame.draw.rect(surface, self.color, self.rect)
 
-    def drawWalls(self): 
+    def drawWalls(self, surface): 
 
         if self.row == 0:
-            pygame.draw.line(SCREEN, WALL_COL, (self.x, self.y), (self.x + SIZE, self.y))
+            pygame.draw.line(surface, WALL_COL, (self.x, self.y), (self.x + SIZE, self.y))
 
         if self.col == 0:
-            pygame.draw.line(SCREEN, WALL_COL, (self.x, self.y), (self.x, self.y + SIZE))
+            pygame.draw.line(surface, WALL_COL, (self.x, self.y), (self.x, self.y + SIZE))
         
         if bool(self.walls[0]): 
 
-            pygame.draw.line(SCREEN, WALL_COL, (self.x + SIZE, self.y), (self.x + SIZE, self.y + SIZE)) 
+            pygame.draw.line(surface, WALL_COL, (self.x + SIZE, self.y), (self.x + SIZE, self.y + SIZE)) 
 
         if bool(self.walls[1]): 
 
-            pygame.draw.line(SCREEN, WALL_COL, (self.x, self.y + SIZE), (self.x + SIZE, self.y + SIZE))
+            pygame.draw.line(surface, WALL_COL, (self.x, self.y + SIZE), (self.x + SIZE, self.y + SIZE))
 
 grid = []
+walls = []
+finalPath = []
 
 for row in range(cellHeight):
     tileRow = []
@@ -80,26 +90,39 @@ for row in range(cellHeight):
     grid.append(tileRow)
 
 currentTile = grid[0][0]
+startTile = grid[0][0]
 endTile = grid[cellHeight - 1][cellWidth - 1]
+
 currentTile.visited = True
+endTile.color = END_COL
 
 stack = [currentTile]
 
 def draw():
     
+    SCREEN.fill((0, 0, 0))
+
     for tileRow in grid:
         for tile in tileRow:
-            tile.drawTiles()
-    
+            pygame.draw.rect(SCREEN, tile.color, tile.rect)
+
     for tileRow in grid:
         for tile in tileRow:
-            tile.drawWalls()
-    
+            tile.drawWalls(SCREEN)
+
+    if showPath:
+        for tile in finalPath:
+            if tile not in (startTile, endTile):
+                pygame.draw.rect(SCREEN, FINAL_COL, pygame.Rect(tile.x + 4, tile.y + 4, SIZE - 5, SIZE - 5))
+
+    if playMode:
+        pygame.draw.rect(SCREEN, PLAYER_COL, playerBox)
+
     pygame.display.flip()
 
 def update():
     
-    global currentTile, pressedAlr, mazeFinished, run, endTile, pathCreated
+    global currentTile, mazeFinished, run, endTile, pathCreated, showPath, playMode
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -108,30 +131,30 @@ def update():
             sys.exit()
             return
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p and mazeFinished:
-                if not pressedAlr:
-                    aStar()
-                    pressedAlr = True
+        if event.type == pygame.KEYDOWN and mazeFinished:
+            if event.key == pygame.K_p and not pathCreated:
+                aStar()
+                showPath = True
+            elif event.key == pygame.K_o and not pathCreated:
+                playMode = True
+
+    for tileRow in grid:
+        for tile in tileRow:
+            if tile in (startTile, endTile):
+                continue
+            if tile.visited:
+                if tile.visitedTwice:
+                    tile.color = PATH_TWICE 
                 else:
-                    print("There is already an instance.")
+                    tile.color = PATH_ONCE
 
-    if pathCreated:
-        return
-
-    if not pathCreated:
-        for tileRow in grid:
-            for tile in tileRow:
-                if tile.visited:
-                    tile.color = PATH_TWICE if tile.visitedTwice else PATH_ONCE
-                if tile == currentTile:
-                    tile.color = FOLLOW_COL
-
+    if currentTile != endTile:
+        currentTile.color = FOLLOW_COL
+        
     if currentTile.visited:
         currentTile.visitedTwice = True
     
     currentTile.visited = True
-    endTile.color = END_COL
 
     if not mazeFinished:
         
@@ -187,7 +210,7 @@ def aStar():
     
     global pathCreated
 
-    start = grid[0][0]
+    start = startTile
     end = grid[cellHeight - 1][cellWidth - 1]
 
     openGrid = []
@@ -266,14 +289,48 @@ def aStar():
         pygame.display.flip()
         pygame.time.delay(10) 
         
-    print("something went wrong")
+    print("something went wrong, please let us know what happened")
 
 def buildBridge(path):
-    current = path.parent
+    
+    finalPath.clear()
+    current = path
+
     while current:
-        if current != grid[0][0]:
-            current.color = FINAL_COL
+        finalPath.append(current)
         current = current.parent
+
+def play():
+    
+    global playMode, showPath, playerCol, playerRow
+
+    keys = pygame.key.get_pressed()
+
+    for event in pygame.event.get():
+        if event.type == pygame.KEYDOWN:
+
+            if (event.key == pygame.K_LEFT or event.key == pygame.K_a and playerCol > 0):
+                if grid[playerRow][playerCol - 1].walls[0] == 0:
+                    playerCol -= 1
+
+            elif (event.key == pygame.K_RIGHT or event.key == pygame.K_d and playerCol < cellWidth - 1):
+                if grid[playerRow][playerCol].walls[0] == 0:
+                    playerCol += 1
+
+            elif (event.key == pygame.K_UP or event.key == pygame.K_w and playerRow > 0):
+                if grid[playerRow - 1][playerCol].walls[1] == 0:
+                    playerRow -= 1
+
+            elif (event.key == pygame.K_DOWN or event.key == pygame.K_s and playerRow < cellHeight - 1):
+                if grid[playerRow][playerCol].walls[1] == 0:
+                    playerRow += 1
+            
+            if playerRow == endTile.row and playerCol == endTile.col:
+                print("You reached the end!")
+                playMode = False
+
+    playerBox.x = grid[playerRow][playerCol].x + 4
+    playerBox.y = grid[playerRow][playerCol].y + 4
 
 run = True
 clock = pygame.time.Clock()
@@ -282,6 +339,8 @@ delta_time = 1
 while run:
     
     draw()
+    if playMode:
+        play()
     update()
 
     delta_time = clock.tick(120) / 1000
