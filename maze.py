@@ -302,14 +302,12 @@ def buildBridge(path):
 
 def play():
     
-    global playMode, showPath, playerCol, playerRow
-
-    keys = pygame.key.get_pressed()
+    global playMode, showPath, playerCol, playerRow, run
 
     for event in pygame.event.get():
         if event.type == pygame.KEYDOWN:
 
-            if (event.key == pygame.K_LEFT or event.key == pygame.K_a and playerCol > 0):
+            if (event.key == pygame.K_LEFT or event.key == pygame.K_a) and playerCol > 0:
                 if grid[playerRow][playerCol - 1].walls[0] == 0:
                     playerCol -= 1
 
@@ -328,6 +326,13 @@ def play():
             if playerRow == endTile.row and playerCol == endTile.col:
                 print("You reached the end!")
                 playMode = False
+        
+        elif event.type == pygame.QUIT:
+            playMode = False
+            run = False
+            pygame.quit()
+            sys.exit()
+            return
 
     playerBox.x = grid[playerRow][playerCol].x + 4
     playerBox.y = grid[playerRow][playerCol].y + 4
